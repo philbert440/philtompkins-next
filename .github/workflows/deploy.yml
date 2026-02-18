@@ -15,8 +15,23 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_KEY }}
           script: |
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            
+            # First deploy: clone if not exists
+            if [ ! -d ~/philtompkins-next ]; then
+              git clone https://github.com/philbert440/philtompkins-next.git ~/philtompkins-next
+            fi
+            
             cd ~/philtompkins-next
-            git pull
-            npm ci
+            git pull origin main
+            npm ci --production=false
             npm run build
-            systemctl --user restart philtompkins
+            
+            # Restart via PM2 if configured, otherwise start
+            if pm2 describe philtompkins-next > /dev/null 2>&1; then
+              pm2 restart philtompkins-next
+            else
+              PORT=3002 pm2 start npm --name "philtompkins-next" -- start
+              pm2 save
+            fi
