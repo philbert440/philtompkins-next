@@ -1,0 +1,15 @@
+[Unit]
+Description=Phil Tompkins Next.js Portfolio
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/philbot/philtompkins-next
+ExecStart=/usr/bin/npm run start
+Restart=on-failure
+RestartSec=5
+Environment=NODE_ENV=production
+Environment=PORT=3002
+
+[Install]
+WantedBy=default.target
