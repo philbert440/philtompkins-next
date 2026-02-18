@@ -145,6 +145,11 @@ export default function ChatWidget() {
             ))}
           </div>
 
+          {/* Disclaimer */}
+          <div className="px-3 pt-2 text-center">
+            <span className="text-[10px] text-gray-600">Powered by AI · Answers may not be perfect</span>
+          </div>
+
           {/* Input */}
           <form onSubmit={handleSubmit} className="p-3 border-t border-emerald-500/20">
             <div className="flex gap-2">
