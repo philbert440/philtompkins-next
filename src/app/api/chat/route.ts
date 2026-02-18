@@ -3,9 +3,9 @@ import fs from 'fs';
 import path from 'path';
 import OpenAI from 'openai';
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
+const XAI_API_KEY = process.env.XAI_API_KEY || '';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
-const MODEL = 'claude-sonnet-4-20250514';
+const MODEL = 'grok-4-1-fast-non-reasoning';
 const EMBEDDING_MODEL = 'text-embedding-3-small';
 const TOP_K = 5;
 const MAX_INPUT_LENGTH = 500;
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    if (!ANTHROPIC_API_KEY) {
+    if (!XAI_API_KEY) {
       return new Response(JSON.stringify({ error: 'Chat is not configured yet. Check back soon!' }), {
         status: 503,
         headers: { 'Content-Type': 'application/json' },
@@ -158,64 +158,35 @@ export async function POST(request: NextRequest) {
     const systemPrompt = buildSystemPrompt(contextChunks);
 
     const messages = [
-      ...(history || []).slice(-10).map((m: any) => ({ role: m.role, content: String(m.content).slice(0, MAX_INPUT_LENGTH) })),
-      { role: 'user', content: sanitized },
+      { role: 'system' as const, content: systemPrompt },
+      ...(history || []).slice(-10).map((m: any) => ({
+        role: m.role as 'user' | 'assistant',
+        content: String(m.content).slice(0, MAX_INPUT_LENGTH),
+      })),
+      { role: 'user' as const, content: sanitized },
     ];
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 512,
-        system: systemPrompt,
-        messages,
-        stream: true,
-      }),
+    // xAI uses OpenAI-compatible API
+    const xai = new OpenAI({
+      apiKey: XAI_API_KEY,
+      baseURL: 'https://api.x.ai/v1',
     });
 
-    if (!response.ok) {
-      const err = await response.text();
-      return new Response(JSON.stringify({ error: 'API error', details: err }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
+    const stream = await xai.chat.completions.create({
+      model: MODEL,
+      max_tokens: 512,
+      messages,
+      stream: true,
+    });
 
     const encoder = new TextEncoder();
-    const stream = new ReadableStream({
+    const readable = new ReadableStream({
       async start(controller) {
-        const reader = response.body!.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-
         try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
-
-            for (const line of lines) {
-              const trimmed = line.trim();
-              if (!trimmed || !trimmed.startsWith('data: ')) continue;
-              const data = trimmed.slice(6);
-              if (data === '[DONE]') continue;
-
-              try {
-                const parsed = JSON.parse(data);
-                if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-                  controller.enqueue(encoder.encode(parsed.delta.text));
-                }
-              } catch {
-                // skip malformed chunks
-              }
+          for await (const chunk of stream) {
+            const text = chunk.choices[0]?.delta?.content;
+            if (text) {
+              controller.enqueue(encoder.encode(text));
             }
           }
         } finally {
@@ -224,13 +195,14 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return new Response(stream, {
+    return new Response(readable, {
       headers: {
         'Content-Type': 'text/plain; charset=utf-8',
         'Transfer-Encoding': 'chunked',
       },
     });
   } catch (error) {
+    console.error('Chat API error:', error);
     return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
