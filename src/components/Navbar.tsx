@@ -7,6 +7,7 @@ import { Github, Twitter, Youtube, Linkedin, Sun, Moon, Menu, X } from "lucide-r
 const navLinks = [
   { href: "/", label: "Home" },
   { href: "/projects", label: "Projects" },
+  { href: "/blog", label: "Blog" },
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },
 ];
