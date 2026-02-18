@@ -31,6 +31,6 @@ jobs:
           script: |
             cd ~/philtompkins-next
             git pull origin main
-            npm ci --production=false
+            npm install
             npm run build
-            pm2 restart philtompkins-next
+            PORT=3002 pm2 restart philtompkins-next --update-env
