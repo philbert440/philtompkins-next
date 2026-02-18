@@ -35,25 +35,17 @@ cp .env.example .env.local
 
 ## Deployment
 
-The site runs on an Azure VM with Nginx + systemd.
-
-### First-time setup
-
-```bash
-bash deploy/setup.sh
-```
-
-This installs Nginx config, SSL certs, systemd service, builds the app, and starts everything.
+The site runs on an Azure VM (AdapifyProd2) with Apache reverse proxy + PM2.
 
 ### Automatic deploys
 
-Pushes to `main` trigger `.github/workflows/deploy.yml`, which SSHs into the VM, pulls, builds, and restarts.
+Pushes to `main` trigger `.github/workflows/deploy.yml`, which SSHs into the VM, pulls, builds, and restarts PM2.
 
 **Required GitHub Secrets:** `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_KEY`
 
 ### Config files
 
-- `deploy/nginx.conf` — Nginx reverse proxy config
-- `deploy/philtompkins.service` — systemd service unit
-- `deploy/setup.sh` — one-time setup script
+- `deploy/apache-philtompkins.conf` — Apache HTTP redirect
+- `deploy/apache-philtompkins-le-ssl.conf` — Apache SSL reverse proxy config
+- `deploy/setup-apache.sh` — one-time Apache setup script
 - `.github/workflows/deploy.yml` — CI/CD pipeline
